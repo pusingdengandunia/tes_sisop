@@ -112,6 +112,7 @@ void *handle_client(void *arg) {
     char buffer[BUFFER_SIZE];
     char message[BUFFER_SIZE + NAME_LEN + 32];
     int leave_flag = 0;
+    int added_to_list = 0;  // Track if client was added to global list
     
     client_t *client = (client_t *)arg;
     
@@ -147,9 +148,10 @@ void *handle_client(void *arg) {
         leave_flag = 1;
     }
     
+    // Add client to array only after validation passes
     if (!leave_flag) {
         add_client(client);
-        
+        added_to_list = 1;  // Mark that client is in the list
         sprintf(message, "%s has joined the room '%s'\n", client->name, client->room);
         printf("%s", message);
         send_message(message, client->room, client->socket);
@@ -192,7 +194,15 @@ void *handle_client(void *arg) {
     }
     
     close(client->socket);
-    remove_client(client->socket);
+    
+    // Only remove from array if client was added
+    if (added_to_list) {
+        remove_client(client->socket);
+    } else {
+        // Client failed validation, just free the struct
+        free(client);
+    }
+    
     pthread_detach(pthread_self());
     
     return NULL;
@@ -316,7 +326,6 @@ void start_server() {
         client->socket = client_socket;
         client->active = 1;
         
-        add_client(client);
         pthread_create(&tid, NULL, &handle_client, (void *)client);
     }
 }
